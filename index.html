@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VM 2026 · Tippekonkurransen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green:   #1a6b3a;
+    --green-l: #228b4b;
+    --gold:    #f5c518;
+    --gold-d:  #c9a010;
+    --pitch:   #0d2818;
+    --bg:      #0f1c10;
+    --card:    #162418;
+    --border:  #1e3520;
+    --text:    #e8f0e9;
+    --muted:   #7a9e7e;
+    --white:   #ffffff;
+    --red:     #e05050;
+    --blue:    #4a90d9;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--pitch);
+    border-bottom: 2px solid var(--green);
+    padding: 0 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 1rem;
+  }
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    color: var(--gold);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+  .logo span { color: var(--text); font-weight: 400; }
+
+  nav { display: flex; gap: 0.25rem; }
+  nav button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.75rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  nav button:hover { color: var(--text); background: var(--border); }
+  nav button.active { color: var(--gold); background: var(--border); }
+
+  /* MAIN */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    padding: 2rem 0 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+  .hero h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    color: var(--white);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+  .hero h1 em { color: var(--gold); font-style: normal; }
+  .hero p { color: var(--muted); font-size: 0.95rem; }
+  .hero .flags { font-size: 1.4rem; margin-bottom: 0.75rem; letter-spacing: 0.15em; }
+
+  /* CARDS */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  /* LEADERBOARD */
+  .leaderboard { width: 100%; border-collapse: collapse; }
+  .leaderboard th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .leaderboard th:not(:first-child) { text-align: right; }
+  .leaderboard td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+  }
+  .leaderboard td:not(:first-child) { text-align: right; }
+  .leaderboard tr:last-child td { border-bottom: none; }
+  .leaderboard tr:hover td { background: rgba(255,255,255,0.03); }
+
+  .rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    width: 2rem;
+    display: inline-block;
+    text-align: center;
+  }
+  .rank-1 { color: var(--gold); }
+  .rank-2 { color: #c0c0c0; }
+  .rank-3 { color: #cd7f32; }
+
+  .pts-big {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.3rem;
+    color: var(--gold);
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    background: var(--border);
+    color: var(--muted);
+  }
+  .badge.exact { background: rgba(245,197,24,0.15); color: var(--gold); }
+  .badge.result { background: rgba(26,107,58,0.3); color: #5dc87a; }
+
+  /* MATCH LIST */
+  .match-group { margin-bottom: 2rem; }
+  .group-header {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green-l);
+    padding: 0.5rem 0;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .match-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .match-row:hover { border-color: var(--green); }
+  .match-row.played { border-left: 3px solid var(--green); }
+
+  .team-name {
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+  .team-name.home { text-align: right; }
+  .team-name.away { text-align: left; }
+
+  .score-box {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.2rem;
+    white-space: nowrap;
+  }
+  .score-actual { color: var(--white); }
+  .score-sep { color: var(--muted); font-size: 0.8rem; }
+  .score-pred { color: var(--muted); font-size: 0.9rem; }
+
+  /* PREDICTIONS PANEL */
+  .predictions-panel {
+    display: none;
+    background: var(--pitch);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .predictions-panel.open { display: block; }
+  .pred-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+  }
+  .pred-item {
+    background: var(--card);
+    border-radius: 5px;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+  }
+  .pred-item.exact { border-color: var(--gold-d); background: rgba(245,197,24,0.07); }
+  .pred-item.result { border-color: var(--green); background: rgba(26,107,58,0.15); }
+  .pred-item.wrong { opacity: 0.5; }
+  .pred-name { font-weight: 600; color: var(--muted); font-size: 0.8rem; }
+  .pred-score { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; }
+
+  /* KNOCKOUT */
+  .bracket {
+    overflow-x: auto;
+    padding-bottom: 1rem;
+  }
+  .bracket-rounds {
+    display: flex;
+    gap: 1.5rem;
+    min-width: max-content;
+  }
+  .bracket-round { display: flex; flex-direction: column; gap: 0.5rem; }
+  .bracket-round-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+    text-align: center;
+  }
+  .bracket-match {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+    width: 150px;
+  }
+  .bracket-team {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .bracket-team:last-child { border-bottom: none; }
+  .bracket-team.winner { background: rgba(26,107,58,0.25); color: var(--white); font-weight: 600; }
+  .bracket-team.correct { background: rgba(245,197,24,0.15); }
+
+  /* DELTAKERE */
+  .participant-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .participant-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    color: var(--white);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .participant-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.75rem;
+  }
+  .stat-box {
+    background: var(--pitch);
+    border-radius: 5px;
+    padding: 0.6rem 0.75rem;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    color: var(--gold);
+    display: block;
+  }
+  .stat-lbl {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* POENGSYSTEM */
+  .points-table { width: 100%; border-collapse: collapse; }
+  .points-table tr { border-bottom: 1px solid var(--border); }
+  .points-table td { padding: 0.65rem 0.75rem; font-size: 0.9rem; }
+  .points-table td:last-child {
+    text-align: right;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--gold);
+    width: 3rem;
+  }
+
+  /* LOADING */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem;
+    color: var(--muted);
+  }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--green-l);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-msg {
+    background: rgba(224,80,80,0.1);
+    border: 1px solid rgba(224,80,80,0.3);
+    border-radius: 6px;
+    padding: 1rem;
+    color: var(--red);
+    font-size: 0.9rem;
+  }
+
+  /* STATUS BAR */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--pitch);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .status-bar .dot {
+    width: 7px; height: 7px;
+    background: var(--green-l);
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.4rem;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    nav button { padding: 0.4rem 0.5rem; font-size: 0.8rem; }
+    .logo { font-size: 1.1rem; }
+    .match-row { grid-template-columns: 1fr auto 1fr; gap: 0.4rem; padding: 0.6rem 0.75rem; }
+    .team-name { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">⚽ VM <em>2026</em> <span>· Tippen</span></div>
+    <nav>
+      <button class="active" onclick="showSection('ledertavle')">🏆 Ledertavle</button>
+      <button onclick="showSection('kamper')">⚽ Kamper</button>
+      <button onclick="showSection('sluttspill')">🔮 Sluttspill</button>
+      <button onclick="showSection('deltakere')">👤 Deltakere</button>
+      <button onclick="showSection('poeng')">📋 Poeng</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- LEDERTAVLE -->
+  <section id="ledertavle" class="section active">
+    <div class="hero">
+      <div class="flags">🇺🇸 🇲🇽 🇨🇦</div>
+      <h1>VM <em>2026</em></h1>
+      <p>Tippekonkurransen · FIFA World Cup</p>
+    </div>
+    <div id="status-bar" class="status-bar">
+      <span><span class="dot"></span>Henter resultater...</span>
+      <span id="last-updated"></span>
+    </div>
+    <div class="card">
+      <div class="card-title">🏆 Ledertavle</div>
+      <div id="leaderboard-content"><div class="loading"><div class="spinner"></div>Laster inn...</div></div>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-title">🔮 Verdensmester-tips</div>
+      <div id="champion-picks"></div>
+    </div>
+  </section>
+
+  <!-- KAMPER -->
+  <section id="kamper" class="section">
+    <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.6rem;margin-bottom:1.5rem;">⚽ Kamper — Gruppespill</h2>
+    <div id="matches-content"><div class="loading"><div class="spinner"></div>Laster inn...</div></div>
+  </section>
+
+  <!-- SLUTTSPILL -->
+  <section id="sluttspill" class="section">
+    <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.6rem;margin-bottom:1.5rem;">🔮 Sluttspill-tips</h2>
+    <p style="color:var(--muted);margin-bottom:1.5rem;font-size:0.9rem;">Antall deltakere som har tippet hvert lag til å nå runden.</p>
+    <div id="knockout-content"><div class="loading"><div class="spinner"></div>Laster inn...</div></div>
+  </section>
+
+  <!-- DELTAKERE -->
+  <section id="deltakere" class="section">
+    <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.6rem;margin-bottom:1.5rem;">👤 Deltakere</h2>
+    <div id="participants-content"><div class="loading"><div class="spinner"></div>Laster inn...</div></div>
+  </section>
+
+  <!-- POENGSYSTEM -->
+  <section id="poeng" class="section">
+    <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.6rem;margin-bottom:1.5rem;">📋 Poengsystem</h2>
+    <div class="card">
+      <table class="points-table">
+        <tr><td>Riktig målscore (kun gruppespill)</td><td>2</td></tr>
+        <tr><td>Riktig resultat H/U/B (kun gruppespill)</td><td>3</td></tr>
+        <tr><td>Riktig plassering i gruppe</td><td>2</td></tr>
+        <tr><td>Bonus: 100% riktig gruppe (rekkefølge)</td><td>10</td></tr>
+        <tr><td>Lag til 16-delsfinalen</td><td>4</td></tr>
+        <tr><td>Lag til åttedelsfinalen</td><td>6</td></tr>
+        <tr><td>Lag til kvartfinale</td><td>8</td></tr>
+        <tr><td>Lag til semifinale</td><td>10</td></tr>
+        <tr><td>Lag til finale</td><td>10</td></tr>
+        <tr><td>Bronsevinner</td><td>10</td></tr>
+        <tr><td>Verdensmester</td><td>15</td></tr>
+      </table>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-title">Sluttspill</div>
+      <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;">I sluttspillet (fra 16-delsfinale og frem til finalen) er det bare <strong style="color:var(--text)">vinner av kampen</strong> som teller — ikke målscoren. Riktig vinner gir poeng for den runden laget nådde.</p>
+    </div>
+  </section>
+
+</main>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
