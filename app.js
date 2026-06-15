@@ -1,6 +1,6 @@
 // VM 2026 Tippekonkurransen
 
-// ─── NAV ───────────────────────────────────────────────────────────────────
+// ─── NAV ─────────────────────────────────────────────────────────────────────
 function showSection(id, btn) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
@@ -8,7 +8,7 @@ function showSection(id, btn) {
   btn.classList.add('active');
 }
 
-// ─── TEAM NAME NORMALISATION ────────────────────────────────────────────────
+// ─── TEAM NAMES ──────────────────────────────────────────────────────────────
 const TEAM_MAP = {
   'Sør-Afrika':'South Africa','Sør-Korea':'South Korea',
   'Bosnia-Hercegovina':'Bosnia and Herzegovina','Tsjekkia':'Czech Republic',
@@ -29,7 +29,7 @@ const TEAM_MAP = {
   'Haiti':'Haiti','Iran':'Iran','Argentina':'Argentina',
   'Portugal':'Portugal','England':'England',
 };
-function normTeam(n){ return n ? (TEAM_MAP[n]||n) : ''; }
+function normTeam(n){ return n ? (TEAM_MAP[n] || n) : ''; }
 
 const FLAGS = {
   'Mexico':'🇲🇽','South Africa':'🇿🇦','South Korea':'🇰🇷','Czech Republic':'🇨🇿',
@@ -47,8 +47,21 @@ const FLAGS = {
 };
 function flag(t){ return FLAGS[normTeam(t)] || FLAGS[t] || '🏳️'; }
 function getResult(h,a){ return h>a?'H':h<a?'B':'U'; }
+function setEl(id, html){ const el=document.getElementById(id); if(el) el.innerHTML=html; }
 
-// ─── CSV PARSER ──────────────────────────────────────────────────────────────
+// ─── FETCH SHEET VIA CORS PROXY ───────────────────────────────────────────────
+// Google Sheets blocks direct fetch() from GitHub Pages (CORS).
+// We use allorigins.win as a transparent CORS proxy — no key needed.
+async function fetchSheet(sheetId) {
+  const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=2026%20World%20Cup`;
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(sheetUrl)}`;
+  const resp = await fetch(proxyUrl);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (!data.contents) throw new Error('Tom respons fra proxy');
+  return parseCSV(data.contents);
+}
+
 function parseCSV(text) {
   return text.split('\n').map(line => {
     const cells = []; let cur = '', inQ = false;
@@ -61,15 +74,6 @@ function parseCSV(text) {
     cells.push(cur.trim());
     return cells;
   });
-}
-
-// ─── FETCH SHEET ─────────────────────────────────────────────────────────────
-async function fetchSheet(sheetId) {
-  // Use the CSV export endpoint — works without API key for public sheets
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=2026%20World%20Cup`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status} for sheet ${sheetId}`);
-  return parseCSV(await resp.text());
 }
 
 // ─── PARSE PREDICTIONS ───────────────────────────────────────────────────────
@@ -90,33 +94,32 @@ function parsePredictions(rows) {
       groupMatches.push({ num:matchNum, home, away, homeGoals:hg, awayGoals:ag });
     }
 
-    const pick = col => { const v=row[col]?.replace(/"/g,'').trim(); return v&&v!==''&&v!=='0'?v:null; };
+    const pick = col => {
+      const v = row[col]?.replace(/"/g,'').trim();
+      return v && v !== '' && v !== '0' ? v : null;
+    };
 
     if (pick(51)) knockout.r32.push(pick(51));
     if (pick(58)) knockout.r16.push(pick(58));
     if (pick(65)) knockout.qf.push(pick(65));
     if (pick(72)) knockout.sf.push(pick(72));
-
-    if (pick(79)) {
-      const win = row[80]?.replace(/"/g,'').trim();
-      if (win === '1' && !knockout.champion) knockout.champion = pick(79);
+    if (pick(79) && row[80]?.replace(/"/g,'').trim() === '1' && !knockout.champion) {
+      knockout.champion = pick(79);
     }
   }
 
   ['r32','r16','qf','sf'].forEach(r => {
     knockout[r] = [...new Set(knockout[r].map(t=>t.trim()).filter(Boolean))];
   });
-
   return { groupMatches, knockout };
 }
 
-// ─── FETCH RESULTS ───────────────────────────────────────────────────────────
+// ─── FETCH ACTUAL RESULTS ────────────────────────────────────────────────────
 async function fetchResults() {
   const url = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Kunne ikke hente kampresultater');
   const data = await resp.json();
-
   const results = {};
   for (const m of data.matches) {
     const played = m.score !== undefined;
@@ -134,19 +137,15 @@ async function fetchResults() {
 function calcScore(preds, results) {
   const P = CONFIG.points;
   let total = 0, exact = 0, result = 0;
-
   for (const pred of preds.groupMatches) {
     const hEn = normTeam(pred.home), aEn = normTeam(pred.away);
     const actual = results[`${hEn}||${aEn}`] || results[`${aEn}||${hEn}`];
     if (!actual?.played) continue;
-
     const flipped = actual.home !== hEn;
     const pH = flipped ? pred.awayGoals : pred.homeGoals;
     const pA = flipped ? pred.homeGoals : pred.awayGoals;
-    const aH = actual.homeGoals, aA = actual.awayGoals;
-
-    if (pH === aH && pA === aA) { total += P.exactScore; exact++; }
-    if (getResult(pH,pA) === getResult(aH,aA)) { total += P.correctResult; result++; }
+    if (pH === actual.homeGoals && pA === actual.awayGoals) { total += P.exactScore; exact++; }
+    if (getResult(pH,pA) === getResult(actual.homeGoals,actual.awayGoals)) { total += P.correctResult; result++; }
   }
   return { total, exact, result };
 }
@@ -157,11 +156,16 @@ const state = { participants:[], results:{}, loaded:false };
 // ─── BOOT ────────────────────────────────────────────────────────────────────
 async function boot() {
   try {
+    // Fetch results first (no CORS issue)
     const results = await fetchResults();
     state.results = results;
 
+    // Fetch each participant sheet via CORS proxy
+    // Load sequentially to avoid hammering the proxy
     const participants = [];
     for (const p of CONFIG.participants) {
+      setEl('status-bar',
+        `<span><span class="dot"></span>Henter tips for ${p.name}...</span><span></span>`);
       try {
         const rows  = await fetchSheet(p.sheetId);
         const preds = parsePredictions(rows);
@@ -169,7 +173,12 @@ async function boot() {
         participants.push({ name:p.name, preds, ...score });
       } catch(e) {
         console.warn(`Feil for ${p.name}:`, e);
-        participants.push({ name:p.name, preds:{groupMatches:[],knockout:{}}, total:0, exact:0, result:0, error:e.message });
+        participants.push({
+          name:p.name,
+          preds:{groupMatches:[],knockout:{}},
+          total:0, exact:0, result:0,
+          error: e.message
+        });
       }
     }
 
@@ -179,18 +188,12 @@ async function boot() {
     renderAll();
 
   } catch(e) {
-    setEl('status-bar', `<span>⚠️ Feil: ${e.message}</span>`);
+    setEl('status-bar', `<span>⚠️ Feil: ${e.message}</span><span></span>`);
     setEl('leaderboard-content', `<div class="error-msg">⚠️ ${e.message}</div>`);
   }
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function setEl(id, html) {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = html;
-}
-
-// ─── RENDER ──────────────────────────────────────────────────────────────────
+// ─── RENDER ALL ──────────────────────────────────────────────────────────────
 function renderAll() {
   renderStatus();
   renderLeaderboard();
@@ -213,12 +216,13 @@ function renderLeaderboard() {
   const medals = ['🥇','🥈','🥉'];
   const rows = state.participants.map((p,i) => `
     <tr>
-      <td><span class="rank ${i<3?'rank-'+(i+1):''}">${medals[i]||i+1}</span> ${p.name}</td>
+      <td><span class="rank ${i<3?'rank-'+(i+1):''}">${medals[i]||i+1}</span> ${p.name}
+        ${p.error ? `<span style="color:var(--red);font-size:.75rem"> ⚠ ${p.error}</span>` : ''}
+      </td>
       <td><span class="pts-big">${p.total}</span></td>
       <td><span class="badge exact">${p.exact} eksakt</span></td>
       <td><span class="badge result">${p.result} H/U/B</span></td>
     </tr>`).join('');
-
   setEl('leaderboard-content', `
     <table class="leaderboard">
       <thead><tr><th>Deltaker</th><th>Poeng</th><th>Eksakt</th><th>Resultat</th></tr></thead>
@@ -231,7 +235,7 @@ function renderChampions() {
     .filter(p => p.preds?.knockout?.champion)
     .map(p => `
       <div style="display:flex;align-items:center;justify-content:space-between;
-                  padding:0.5rem 0;border-bottom:1px solid var(--border)">
+                  padding:.5rem 0;border-bottom:1px solid var(--border)">
         <span style="color:var(--muted);font-size:.9rem">${p.name}</span>
         <span style="font-weight:600">${flag(p.preds.knockout.champion)} ${p.preds.knockout.champion}</span>
       </div>`).join('');
@@ -244,8 +248,10 @@ function groupOf(num) {
 
 function renderMatches() {
   const ref = state.participants.find(p => p.preds?.groupMatches?.length > 0);
-  if (!ref) { setEl('matches-content','<p style="color:var(--muted)">Ingen kampdata.</p>'); return; }
-
+  if (!ref) {
+    setEl('matches-content','<div class="error-msg">⚠️ Kunne ikke hente kampdata fra Google Sheets. Sjekk at alle ark er delt som "Anyone with the link".</div>');
+    return;
+  }
   const byGroup = {};
   for (const match of ref.preds.groupMatches) {
     const g = groupOf(match.num);
@@ -254,7 +260,6 @@ function renderMatches() {
     const actual = state.results[`${hEn}||${aEn}`] || state.results[`${aEn}||${hEn}`];
     byGroup[g].push({ match, actual, hEn, aEn });
   }
-
   let html = '';
   for (const [grp, list] of Object.entries(byGroup)) {
     html += `<div class="match-group"><div class="group-header">⚽ ${grp}</div>`;
@@ -269,9 +274,7 @@ function renderMatches() {
           <div class="score-box"><span class="score-actual">${aH} – ${aA}</span></div>
           <div class="team-name away">${match.away} ${flag(aEn)}</div>
         </div>
-        <div id="${pid}" class="predictions-panel">
-          ${predPanel(match.num, played, actual)}
-        </div>`;
+        <div id="${pid}" class="predictions-panel">${predPanel(match.num, played, actual)}</div>`;
     }
     html += '</div>';
   }
@@ -282,11 +285,9 @@ function predPanel(matchNum, played, actual) {
   const items = state.participants.map(p => {
     const pred = p.preds?.groupMatches?.find(m => m.num === matchNum);
     if (!pred) return `<div class="pred-item"><span class="pred-name">${p.name}</span><span class="pred-score">–</span></div>`;
-
     let cls = '';
     if (played && actual) {
-      const hEn = normTeam(pred.home);
-      const flipped = actual.home !== hEn;
+      const flipped = actual.home !== normTeam(pred.home);
       const pH = flipped ? pred.awayGoals : pred.homeGoals;
       const pA = flipped ? pred.homeGoals : pred.awayGoals;
       const exact = pH===actual.homeGoals && pA===actual.awayGoals;
@@ -298,12 +299,11 @@ function predPanel(matchNum, played, actual) {
       <span class="pred-score">${pred.homeGoals}–${pred.awayGoals}</span>
     </div>`;
   }).join('');
-
   return `<div style="margin-bottom:.5rem;font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Tips</div>
     <div class="pred-grid">${items}</div>
     <div style="margin-top:.75rem;font-size:.72rem;color:var(--muted)">
       <span style="color:var(--gold)">■</span> Eksakt &nbsp;
-      <span style="color:#5dc87a">■</span> Riktig H/U/B &nbsp;
+      <span style="color:var(--cyan)">■</span> Riktig H/U/B &nbsp;
       <span style="opacity:.4">■</span> Feil
     </div>`;
 }
@@ -318,14 +318,12 @@ function renderKnockout() {
     {key:'r32',label:'16-delsfin.'},{key:'r16',label:'8-delsfin.'},
     {key:'qf',label:'Kvartfinale'},{key:'sf',label:'Semifinale'},
   ];
-
   let html = '<div class="bracket"><div class="bracket-rounds">';
   for (const {key,label} of rounds) {
     const counts = {};
     for (const p of state.participants)
       for (const t of (p.preds?.knockout?.[key]||[]))
         counts[t] = (counts[t]||0)+1;
-
     const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
     html += `<div class="bracket-round"><div class="bracket-round-title">${label}</div>`;
     for (const [team,count] of sorted)
@@ -335,8 +333,6 @@ function renderKnockout() {
       </div></div>`;
     html += '</div>';
   }
-
-  // Champion
   html += `<div class="bracket-round"><div class="bracket-round-title">🏆 Mester</div>`;
   for (const p of state.participants)
     if (p.preds?.knockout?.champion)
@@ -367,5 +363,4 @@ function renderParticipants() {
   setEl('participants-content', html);
 }
 
-// ─── START ────────────────────────────────────────────────────────────────────
 boot();
